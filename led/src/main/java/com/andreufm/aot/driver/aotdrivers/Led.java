@@ -1,5 +1,8 @@
 package com.andreufm.aot.driver.aotdrivers;
 
+import android.support.annotation.VisibleForTesting;
+import android.util.Log;
+
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.PeripheralManagerService;
 
@@ -10,7 +13,11 @@ import java.io.IOException;
  */
 
 public class Led implements AutoCloseable {
-    private static final String TAG = Led.class.getSimpleName();
+    /*package*/ static final String TAG = Led.class.getSimpleName();
+    /*package*/ static final String MSG_TURNED_ON = "Led turned ON !";
+    /*package*/ static final String MSG_TURNED_OFF = "Led turned OFF !";
+
+
 
     /**
      * Logic level when the Led is considered to be on.
@@ -21,7 +28,7 @@ public class Led implements AutoCloseable {
     }
 
 
-    private final Gpio mLedGpio;
+    private Gpio mLedGpio;
 
 
     /**
@@ -42,32 +49,66 @@ public class Led implements AutoCloseable {
      *
      * @param pin GPIO pin where the LED is attached.
      * @param logicState Logic level when the LED is considered to be ON.
-     * @param pioService PeripheralManagerService from android things SDK.
      * @throws IOException
      */
-    public Led(String pin, LogicState logicState, PeripheralManagerService pioService) throws IOException {
-        mLedGpio = pioService.openGpio(pin);
+    public Led(String pin, LogicState logicState) throws IOException {
+        PeripheralManagerService pioService = new PeripheralManagerService();
+        Gpio gpioPin = pioService.openGpio(pin);
+        try {
+            setUp(gpioPin, logicState);
+        } catch (IOException|RuntimeException e) {
+            close();
+            throw e;
+        }
     }
 
     /**
-     * Helper method to facilitate creating Led drivers with the default Peripheral
-     * Manager Service from Android things.
-     *
-     * @param pin GPIO pin where the LED is attached.
-     * @param logicState Logic level when the LED is considered to be ON.
-     * @return Instace of an LED driver.
-     * @throws IOException
+     * Constructor invoked from unit tests.
      */
-    public static Led getInstance(String pin, LogicState logicState) throws IOException {
-        return new Led(pin, logicState, new PeripheralManagerService());
+    @VisibleForTesting
+    /*package*/ Led(Gpio gpioPin, LogicState logicState) throws IOException {
+        setUp(gpioPin, logicState);
     }
 
+    private void setUp(Gpio gpioPin, LogicState logicState) throws IOException {
+        mLedGpio = gpioPin;
+        int direction = getInitialDirection(logicState);
+        mLedGpio.setDirection(direction);
+        int active = getActiveState(logicState);
+        mLedGpio.setActiveType(active);
+        mLedGpio.setValue(true);
+    }
 
+    private int getActiveState(LogicState logicState) {
+        return logicState.equals(LogicState.ON_WHEN_HIGH) ?
+                Gpio.ACTIVE_HIGH : Gpio.ACTIVE_LOW;
+    }
 
+    private int getInitialDirection(LogicState logicState) {
+        return logicState.equals(LogicState.ON_WHEN_HIGH) ?
+                Gpio.DIRECTION_OUT_INITIALLY_LOW : Gpio.DIRECTION_OUT_INITIALLY_HIGH;
+    }
 
 
     @Override
-    public void close() throws Exception {
+    public void close() throws IOException {
         mLedGpio.close();
     }
+
+    public void turnOn() throws IOException {
+        Log.d(TAG, MSG_TURNED_ON);
+        mLedGpio.setValue(true);
+    }
+
+    public void turnOff() throws IOException {
+        Log.d(TAG, MSG_TURNED_OFF);
+        mLedGpio.setValue(false);
+    }
+
+    public void toggle() throws IOException {
+        boolean currentState = mLedGpio.getValue();
+        mLedGpio.setValue(!currentState);
+    }
+
+
 }
