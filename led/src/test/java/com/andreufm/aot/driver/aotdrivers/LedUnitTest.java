@@ -1,5 +1,6 @@
 package com.andreufm.aot.driver.aotdrivers;
 
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.ViewConfiguration;
 
@@ -36,7 +37,8 @@ import static org.powermock.api.mockito.PowerMockito.when;
  * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
  */
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({ViewConfiguration.class, Led.class, Gpio.class, Log.class})
+@PrepareForTest({ViewConfiguration.class, Led.class, Gpio.class,
+        Log.class, UserDriverFactory.class, SystemClock.class})
 public class LedUnitTest {
 
     @Mock
@@ -51,15 +53,20 @@ public class LedUnitTest {
     @Before
     public void setup() throws Exception {
         ViewConfigurationMock.mockStatic();
+        mockStatic(Log.class);
+        mockStatic(UserDriverFactory.class);
+        mockStatic(SystemClock.class);
         mocked_Gpio = Mockito.mock(Gpio.class);
-        PowerMockito.mockStatic(Log.class);
-        ledHigh = new Led(mocked_Gpio, LogicState.ON_WHEN_HIGH);
+        PeripheralManagerService mocked_perManSrv = Mockito.mock(PeripheralManagerService.class);
+        when(UserDriverFactory.getPeripheralManagerService()).thenReturn(mocked_perManSrv);
+        when(mocked_perManSrv.openGpio(anyString())).thenReturn(mocked_Gpio);
+        ledHigh = new Led("1", LogicState.ON_WHEN_HIGH);
         Mockito.reset(mocked_Gpio);
     }
 
     @Test
     public void createLedDriverOnWhenHighVoltage() throws IOException {
-        new Led(mocked_Gpio, LogicState.ON_WHEN_HIGH);
+        new Led("1", LogicState.ON_WHEN_HIGH);
 
         verify(mocked_Gpio).setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
         verify(mocked_Gpio).setActiveType(Gpio.ACTIVE_HIGH);
@@ -68,7 +75,7 @@ public class LedUnitTest {
 
     @Test
     public void createLedDriverOnWhenLowVoltage() throws IOException {
-        new Led(mocked_Gpio, LogicState.ON_WHEN_LOW);
+        new Led("1", LogicState.ON_WHEN_LOW);
 
         verify(mocked_Gpio).setDirection(Gpio.DIRECTION_OUT_INITIALLY_HIGH);
         verify(mocked_Gpio).setActiveType(Gpio.ACTIVE_LOW);
@@ -83,7 +90,7 @@ public class LedUnitTest {
 
     @Test
     public void closeLow() throws Exception {
-        Led ledLow = new Led(mocked_Gpio, LogicState.ON_WHEN_LOW);
+        Led ledLow = new Led("1", LogicState.ON_WHEN_LOW);
         ledLow.close();
         verify(mocked_Gpio).close();
     }
@@ -93,7 +100,7 @@ public class LedUnitTest {
         ledHigh.turnOn();
 
         verify(mocked_Gpio).setValue(true);
-        PowerMockito.verifyStatic(Mockito.times(1));
+        verifyStatic();
         Log.d(eq(Led.TAG), eq(Led.MSG_TURNED_ON));
     }
 
@@ -102,7 +109,7 @@ public class LedUnitTest {
         ledHigh.turnOff();
 
         verify(mocked_Gpio).setValue(false);
-        PowerMockito.verifyStatic(Mockito.times(1));
+        verifyStatic();
         Log.d(eq(Led.TAG), eq(Led.MSG_TURNED_OFF));
     }
 
@@ -117,7 +124,17 @@ public class LedUnitTest {
 
     }
 
-    //TODO: Implement TurnOn and TurnOff with delay
+    @Test
+    public void shouldTurnOnTheLedDuringTheGivenTimeoff() throws IOException {
+        int onDuration = 1500;
+
+        ledHigh.turnOn(onDuration);
+
+        verify(mocked_Gpio).setValue(true);
+        verifyStatic();
+        SystemClock.sleep(onDuration);
+        verify(mocked_Gpio).setValue(false);
+    }
 
     //TODO: Implement TurnOn and TurnOff with offset and delay
 

@@ -1,10 +1,12 @@
 package com.andreufm.aot.driver.aotdrivers;
 
+import android.os.SystemClock;
 import android.support.annotation.VisibleForTesting;
 import android.util.Log;
 
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.PeripheralManagerService;
+import com.google.android.things.userdriver.UserDriverManager;
 
 import java.io.IOException;
 
@@ -28,7 +30,7 @@ public class Led implements AutoCloseable {
     }
 
 
-    private Gpio mLedGpio;
+    private final Gpio mLedGpio;
 
 
     /**
@@ -52,31 +54,19 @@ public class Led implements AutoCloseable {
      * @throws IOException
      */
     public Led(String pin, LogicState logicState) throws IOException {
-        PeripheralManagerService pioService = new PeripheralManagerService();
-        Gpio gpioPin = pioService.openGpio(pin);
         try {
-            setUp(gpioPin, logicState);
+            PeripheralManagerService pioService = UserDriverFactory.getPeripheralManagerService();
+            mLedGpio = pioService.openGpio(pin);
+            int direction = getInitialDirection(logicState);
+            mLedGpio.setDirection(direction);
+            int active = getActiveState(logicState);
+            mLedGpio.setActiveType(active);
+            mLedGpio.setValue(true);
         } catch (IOException|RuntimeException e) {
+            Log.e(TAG, e.getLocalizedMessage());
             close();
             throw e;
         }
-    }
-
-    /**
-     * Constructor invoked from unit tests.
-     */
-    @VisibleForTesting
-    /*package*/ Led(Gpio gpioPin, LogicState logicState) throws IOException {
-        setUp(gpioPin, logicState);
-    }
-
-    private void setUp(Gpio gpioPin, LogicState logicState) throws IOException {
-        mLedGpio = gpioPin;
-        int direction = getInitialDirection(logicState);
-        mLedGpio.setDirection(direction);
-        int active = getActiveState(logicState);
-        mLedGpio.setActiveType(active);
-        mLedGpio.setValue(true);
     }
 
     private int getActiveState(LogicState logicState) {
@@ -99,6 +89,14 @@ public class Led implements AutoCloseable {
         Log.d(TAG, MSG_TURNED_ON);
         mLedGpio.setValue(true);
     }
+
+    public void turnOn(long timeOff) throws IOException {
+        turnOn();
+        SystemClock.sleep(timeOff);
+        turnOff();
+    }
+
+
 
     public void turnOff() throws IOException {
         Log.d(TAG, MSG_TURNED_OFF);
