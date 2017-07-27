@@ -36,7 +36,7 @@ import static org.powermock.api.mockito.PowerMockito.when;
         Log.class, UserDriverFactory.class, SystemClock.class})
 public class LedUnitTest {
 
-    public static final String One = "1";
+    private static final String One = "1";
 
     @Mock
     Gpio mocked_Gpio;
@@ -80,6 +80,12 @@ public class LedUnitTest {
         Mockito.reset(mocked_Gpio);
     }
 
+    private void verifyLogMessageContains(String message) {
+        verifyStatic();
+        Log.d(eq(Led.class.getSimpleName()), contains(message));
+    }
+
+
     @Test
     public void closeHigh() throws Exception {
         ledHigh.close();
@@ -95,20 +101,18 @@ public class LedUnitTest {
 
     @Test
     public void shouldTurnOnTheLed() throws IOException {
-        ledHigh.turnOn();
+        ledHigh.On();
 
         verify(mocked_Gpio).setValue(true);
-        verifyStatic();
-        Log.d(eq(Led.TAG), eq(Led.MSG_TURNED_ON));
+        verifyLogMessageContains("ON");
     }
 
     @Test
     public void shouldTurnOffTheLed() throws IOException {
-        ledHigh.turnOff();
+        ledHigh.Off();
 
         verify(mocked_Gpio).setValue(false);
-        verifyStatic();
-        Log.d(eq(Led.TAG), eq(Led.MSG_TURNED_OFF));
+        verifyLogMessageContains("OFF");
     }
 
     @Test
@@ -125,7 +129,7 @@ public class LedUnitTest {
     public void shouldTurnOnTheLedDuringTheGivenTimeoff() throws IOException {
         int onDuration = 1500;
 
-        ledHigh.turnOn(onDuration);
+        ledHigh.On(onDuration);
 
         verify(mocked_Gpio).setValue(true);
         verifyStatic();

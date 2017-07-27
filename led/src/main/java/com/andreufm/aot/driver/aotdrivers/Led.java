@@ -13,9 +13,9 @@ import java.io.IOException;
  */
 
 public class Led implements AutoCloseable {
-    static final String TAG = Led.class.getSimpleName();
-    static final String MSG_TURNED_ON = "Led turned ON !";
-    static final String MSG_TURNED_OFF = "Led turned OFF !";
+    private static final String TAG = Led.class.getSimpleName();
+    private static final String MSG_TURNED_ON = "Led turned ON !";
+    private static final String MSG_TURNED_OFF = "Led turned OFF !";
 
 
     /**
@@ -70,9 +70,10 @@ public class Led implements AutoCloseable {
         Gpio gpio = openGPIO(pin);
         setDirection(gpio, logicState);
         setActiveState(gpio, logicState);
-        setPinValue(gpio);
+        setHigh(gpio);
         return gpio;
     }
+
 
     private int getInitialDirection(LogicState logicState) {
         return logicState.equals(LogicState.ON_WHEN_HIGH) ?
@@ -99,14 +100,13 @@ public class Led implements AutoCloseable {
         gpio.setActiveType(active);
     }
 
-    private void setPinValue(Gpio gpio) throws IOException {
+    private void setHigh(Gpio gpio) throws IOException {
         gpio.setValue(true);
     }
 
-
-
-
-
+    private void setLow() throws IOException {
+        led.setValue(false);
+    }
 
 
     @Override
@@ -114,36 +114,32 @@ public class Led implements AutoCloseable {
         led.close();
     }
 
-    public void turnOn() throws IOException {
+    public void On() throws IOException {
         Log.d(TAG, MSG_TURNED_ON);
-        setPinValue(led);
+        setHigh(led);
     }
 
-    public void turnOn(long timeOff) throws IOException {
-        turnOn();
+    public void On(long timeOff) throws IOException {
+        On();
         SystemClock.sleep(timeOff);
-        turnOff();
+        Off();
     }
 
-
-
-    public void turnOff() throws IOException {
+    public void Off() throws IOException {
         Log.d(TAG, MSG_TURNED_OFF);
-        led.setValue(false);
+        setLow();
     }
 
     public void toggle() throws IOException {
-        boolean currentState = led.getValue();
-        led.setValue(!currentState);
+        led.setValue(!led.getValue());
     }
 
-
     public static class LedBuilder {
-        private final String pin_num;
+        private final String pin;
         private LogicState state;
 
-        public LedBuilder(String pin_num) {
-            this.pin_num = pin_num;
+        public LedBuilder(String pin) {
+            this.pin = pin;
         }
 
         public LedBuilder turnOnWhenHigh() {
@@ -152,7 +148,7 @@ public class Led implements AutoCloseable {
         }
 
         public Led open() throws IOException {
-            return new Led(pin_num, state);
+            return new Led(pin, state);
         }
 
         public LedBuilder turnOnWhenLow() {
