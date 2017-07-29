@@ -8,6 +8,7 @@ import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.PeripheralManagerService;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -19,11 +20,13 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 
-
-import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.*;
-import static org.powermock.api.mockito.PowerMockito.*;
+import static org.mockito.Mockito.contains;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.powermock.api.mockito.PowerMockito.mockStatic;
+import static org.powermock.api.mockito.PowerMockito.verifyStatic;
 import static org.powermock.api.mockito.PowerMockito.when;
 
 /**
@@ -37,12 +40,13 @@ import static org.powermock.api.mockito.PowerMockito.when;
 public class LedUnitTest {
 
     private static final String One = "1";
+    public static final int TIMEOUT = 1500;
 
     @Mock
     Gpio mocked_Gpio;
 
     @Mock
-    Led ledHigh;
+    Led led;
 
     @Rule
     public ExpectedException mExpectedException = ExpectedException.none();
@@ -73,7 +77,7 @@ public class LedUnitTest {
     }
 
     private void createLedOnPinOneHigh() throws IOException {
-        ledHigh = Led.onPin(One).turnOnWhenHigh().open();
+        led = Led.inGpio(One).turnOnWhenHigh().build();
     }
 
     private void resetMocks() {
@@ -87,21 +91,15 @@ public class LedUnitTest {
 
 
     @Test
-    public void closeHigh() throws Exception {
-        ledHigh.close();
-        verify(mocked_Gpio).close();
-    }
+    public void shouldCloseTheGpio() throws Exception {
+        led.close();
 
-    @Test
-    public void closeLow() throws Exception {
-        Led ledLow = Led.onPin(One).turnOnWhenLow().open();
-        ledLow.close();
         verify(mocked_Gpio).close();
     }
 
     @Test
     public void shouldTurnOnTheLed() throws IOException {
-        ledHigh.On();
+        led.On();
 
         verify(mocked_Gpio).setValue(true);
         verifyLogMessageContains("ON");
@@ -109,7 +107,7 @@ public class LedUnitTest {
 
     @Test
     public void shouldTurnOffTheLed() throws IOException {
-        ledHigh.Off();
+        led.Off();
 
         verify(mocked_Gpio).setValue(false);
         verifyLogMessageContains("OFF");
@@ -117,31 +115,66 @@ public class LedUnitTest {
 
     @Test
     public void shouldToggleTheStateOfTheLed() throws IOException {
-        Mockito.when(mocked_Gpio.getValue()).thenReturn(true);
+        boolean gpioValue = true;
+        Mockito.when(mocked_Gpio.getValue()).thenReturn(gpioValue);
 
-        ledHigh.toggle();
+        led.toggle();
 
         verify(mocked_Gpio).getValue();
-        verify(mocked_Gpio).setValue(false);
+        verify(mocked_Gpio).setValue(!gpioValue);
     }
 
     @Test
-    public void shouldTurnOnTheLedDuringTheGivenTimeoff() throws IOException {
-        int onDuration = 1500;
-
-        ledHigh.On(onDuration);
+    public void shouldTurnOnTheLedDuringTheGivenTimeout() throws IOException {
+        led.On(TIMEOUT);
 
         verify(mocked_Gpio).setValue(true);
-        verifyStatic();
-        SystemClock.sleep(onDuration);
+        verifyTimeout();
         verify(mocked_Gpio).setValue(false);
     }
 
-    //TODO: Implement TurnOn and TurnOff with offset and delay
+    private void verifyTimeout() {
+        verifyStatic();
+        SystemClock.sleep(TIMEOUT);
+    }
+
+    @Test
+    public void shouldTurnOffTheLedDuringTheGivenTimeout() throws IOException {
+        led.Off(TIMEOUT);
+
+        verify(mocked_Gpio).setValue(false);
+        verifyTimeout();
+        verify(mocked_Gpio).setValue(true);
+    }
+
+    @Test
+    public void shouldNotDoAnythingForFrequencyLessThanThresholdBlinkValue(){
+        verifyNoBlink(0);
+        verifyNoBlink(50);
+        verifyNoBlink(90);
+    }
+
+    private void verifyNoBlink(int frequency) {
+        led.blink(frequency);
+
+        verifyZeroInteractions(mocked_Gpio);
+    }
+
+    @Test
+    @Ignore
+    public void shouldBlinkOnce(){
+
+        led.blink(100);
+
+        //verify(mocked_Gpio.setValue(true));
+
+    }
+
 
     //TODO: Implement blink, blink with timeout
 
     //TODO: Implement ON_OFF pattern. ({h 2 l 3}, time units) meaning on for 2 time units off for 3 time units
 
+    //TODO: Helping method list of gpios available
 
 }

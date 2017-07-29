@@ -64,14 +64,9 @@ public class CreateLed_UT {
         Mockito.reset(mocked_GPIO);
     }
 
-
-    //TODO: Rename pin to name, because its confusing what to use gpio names or pin numbers.
-    // As per documentation it should be gpio name.
-    //TODO: Add a helping methos to list the gpio names
-
     @Test
     public void createLedDriverOnWhenVoltageHigh() throws IOException {
-        Led.onPin(One).turnOnWhenHigh().open();
+        Led.inGpio(One).turnOnWhenHigh().build();
 
         verify(mocked_GPIO).setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
         verify(mocked_GPIO).setActiveType(Gpio.ACTIVE_HIGH);
@@ -80,11 +75,20 @@ public class CreateLed_UT {
 
     @Test
     public void createLedDriverOnWhenVoltageLow() throws IOException {
-        Led.onPin(One).turnOnWhenLow().open();
+        Led.inGpio(One).turnOnWhenLow().build();
 
         verify(mocked_GPIO).setDirection(Gpio.DIRECTION_OUT_INITIALLY_HIGH);
         verify(mocked_GPIO).setActiveType(Gpio.ACTIVE_LOW);
         verify(mocked_GPIO).setValue(true);
     }
+
+    @Test
+    public void createLedWithDefaultHandler(){
+        // assert that led.getHandler() is not null
+    }
+
+    //TODO: create led with handler, custom or testing handler for delayed actions.
+
+    //TODO: Setup led call back when LED switch state
 
 }

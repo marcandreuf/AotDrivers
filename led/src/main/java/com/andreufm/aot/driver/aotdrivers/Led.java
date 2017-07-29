@@ -17,21 +17,17 @@ public class Led implements AutoCloseable {
     private static final String MSG_TURNED_ON = "Led turned ON !";
     private static final String MSG_TURNED_OFF = "Led turned OFF !";
 
-
-    /**
-     * Logic level when the Led is considered to be on.
-     */
-    public enum LogicState {
+    private enum LogicState {
         ON_WHEN_HIGH,
         ON_WHEN_LOW
     }
-
 
     private final Gpio led;
 
 
     /**
-     * Interface definition for a callback to be invoked when the Led turn-on event occurs.
+     * Interface definition for a callback to be invoked when the Led
+     * switch state event occurs.
      */
     public interface OnLEDEventListener {
         /**
@@ -40,24 +36,21 @@ public class Led implements AutoCloseable {
          * @param led the Led for which the event occurred
          * @param state true if the Led is now ON
          */
-        void onButtonEvent(Led led, boolean state);
+        void onLedSwitchEvent(Led led, boolean state);
     }
 
-
-
-    public static LedBuilder onPin(String pin_num) {
-        return new LedBuilder(pin_num);
+    public static LedBuilder inGpio(String gpioName) {
+        return new LedBuilder(gpioName);
     }
 
-
-    private Led(String pin, LogicState logicState) throws IOException {
-        led = tryOpenGPIO(pin, logicState);
+    private Led(String gpioName, LogicState logicState) throws IOException {
+        led = tryOpenGPIO(gpioName, logicState);
     }
 
-    private Gpio tryOpenGPIO(String pin, LogicState logicState) throws IOException {
+    private Gpio tryOpenGPIO(String gpioName, LogicState logicState) throws IOException {
         Gpio led;
         try {
-            led = setupGPIO(pin, logicState);
+            led = setupGPIO(gpioName, logicState);
         } catch (IOException|RuntimeException e) {
             Log.e(TAG, e.getLocalizedMessage());
             close();
@@ -66,28 +59,18 @@ public class Led implements AutoCloseable {
         return led;
     }
 
-    private Gpio setupGPIO(String pin, LogicState logicState) throws IOException {
-        Gpio gpio = openGPIO(pin);
+    private Gpio setupGPIO(String gpioName, LogicState logicState) throws IOException {
+        Gpio gpio = openGPIO(gpioName);
         setDirection(gpio, logicState);
         setActiveState(gpio, logicState);
         setHigh(gpio);
         return gpio;
     }
 
-
-    private int getInitialDirection(LogicState logicState) {
-        return logicState.equals(LogicState.ON_WHEN_HIGH) ?
-                Gpio.DIRECTION_OUT_INITIALLY_LOW : Gpio.DIRECTION_OUT_INITIALLY_HIGH;
-    }
-
-    private int getActiveState(LogicState logicState) {
-        return logicState.equals(LogicState.ON_WHEN_HIGH) ?
-                Gpio.ACTIVE_HIGH : Gpio.ACTIVE_LOW;
-    }
-
-    private Gpio openGPIO(String pin) throws IOException {
-        PeripheralManagerService pioService = UserDriverFactory.getPeripheralManagerService();
-        return pioService.openGpio(pin);
+    private Gpio openGPIO(String name) throws IOException {
+        PeripheralManagerService pioService =
+                UserDriverFactory.getPeripheralManagerService();
+        return pioService.openGpio(name);
     }
 
     private void setDirection(Gpio gpio, LogicState logicState) throws IOException {
@@ -95,9 +78,19 @@ public class Led implements AutoCloseable {
         gpio.setDirection(direction);
     }
 
+    private int getInitialDirection(LogicState logicState) {
+        return logicState.equals(LogicState.ON_WHEN_HIGH) ?
+                Gpio.DIRECTION_OUT_INITIALLY_LOW : Gpio.DIRECTION_OUT_INITIALLY_HIGH;
+    }
+
     private void setActiveState(Gpio gpio,LogicState logicState) throws IOException {
         int active = getActiveState(logicState);
         gpio.setActiveType(active);
+    }
+
+    private int getActiveState(LogicState logicState) {
+        return logicState.equals(LogicState.ON_WHEN_HIGH) ?
+                Gpio.ACTIVE_HIGH : Gpio.ACTIVE_LOW;
     }
 
     private void setHigh(Gpio gpio) throws IOException {
@@ -119,10 +112,14 @@ public class Led implements AutoCloseable {
         setHigh(led);
     }
 
-    public void On(long timeOff) throws IOException {
+    public void On(long timeout) throws IOException {
         On();
-        SystemClock.sleep(timeOff);
+        waitFor(timeout);
         Off();
+    }
+
+    private void waitFor(long timeout) {
+        SystemClock.sleep(timeout);
     }
 
     public void Off() throws IOException {
@@ -130,16 +127,26 @@ public class Led implements AutoCloseable {
         setLow();
     }
 
+    public void Off(int timeout) throws IOException {
+        Off();
+        waitFor(timeout);
+        On();
+    }
+
     public void toggle() throws IOException {
         led.setValue(!led.getValue());
     }
 
+    public void blink(int i) {
+
+    }
+
     public static class LedBuilder {
-        private final String pin;
+        private final String gpioName;
         private LogicState state;
 
-        public LedBuilder(String pin) {
-            this.pin = pin;
+        public LedBuilder(String gpioName) {
+            this.gpioName = gpioName;
         }
 
         public LedBuilder turnOnWhenHigh() {
@@ -147,8 +154,8 @@ public class Led implements AutoCloseable {
             return this;
         }
 
-        public Led open() throws IOException {
-            return new Led(pin, state);
+        public Led build() throws IOException {
+            return new Led(gpioName, state);
         }
 
         public LedBuilder turnOnWhenLow() {
