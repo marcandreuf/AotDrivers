@@ -168,7 +168,11 @@ public class LedUnitTest {
 
         led.blink(100);
 
-        //verify(mocked_Gpio.setValue(true));
+        //verify called handler postdelay at least once
+
+        // stop blink --> call led.Off() should remove events from handler
+
+        //verify no more actions with handler
 
     }
 
