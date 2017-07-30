@@ -1,6 +1,6 @@
 package com.andreufm.aot.driver.aotdrivers;
 
-import android.os.SystemClock;
+import android.os.Handler;
 import android.util.Log;
 
 import com.google.android.things.pio.Gpio;
@@ -16,6 +16,8 @@ public class Led implements AutoCloseable {
     private static final String TAG = Led.class.getSimpleName();
     private static final String MSG_TURNED_ON = "Led turned ON !";
     private static final String MSG_TURNED_OFF = "Led turned OFF !";
+    private final Handler handler;
+
 
     private enum LogicState {
         ON_WHEN_HIGH,
@@ -43,20 +45,19 @@ public class Led implements AutoCloseable {
         return new LedBuilder(gpioName);
     }
 
-    private Led(String gpioName, LogicState logicState) throws IOException {
+    private Led(String gpioName, LogicState logicState, Handler handler) throws IOException {
+        this.handler = handler == null ? new Handler() : handler;
         led = tryOpenGPIO(gpioName, logicState);
     }
 
     private Gpio tryOpenGPIO(String gpioName, LogicState logicState) throws IOException {
-        Gpio led;
         try {
-            led = setupGPIO(gpioName, logicState);
+            return setupGPIO(gpioName, logicState);
         } catch (IOException|RuntimeException e) {
-            Log.e(TAG, e.getLocalizedMessage());
+            Log.e(TAG, e.getLocalizedMessage(), e);
             close();
             throw e;
         }
-        return led;
     }
 
     private Gpio setupGPIO(String gpioName, LogicState logicState) throws IOException {
@@ -114,27 +115,34 @@ public class Led implements AutoCloseable {
 
     public void On(long timeout) throws IOException {
         On();
-        waitFor(timeout);
-        Off();
+        delayedOffEvent(timeout);
     }
 
-    private void waitFor(long timeout) {
-        SystemClock.sleep(timeout);
+    private void delayedOffEvent(long timeout) {
+        handler.postDelayed(new TurnOffEvent(), timeout);
     }
+
 
     public void Off() throws IOException {
         Log.d(TAG, MSG_TURNED_OFF);
         setLow();
     }
 
-    public void Off(int timeout) throws IOException {
+    public void Off(long timeout) throws IOException {
         Off();
-        waitFor(timeout);
-        On();
+        delayedOnEvent(timeout);
+    }
+
+    private void delayedOnEvent(long timeout) {
+        handler.postDelayed(new TurnOnEvent(), timeout);
     }
 
     public void toggle() throws IOException {
         led.setValue(!led.getValue());
+    }
+
+    public Handler getHandler() {
+        return handler;
     }
 
     public void blink(int i) {
@@ -144,6 +152,7 @@ public class Led implements AutoCloseable {
     public static class LedBuilder {
         private final String gpioName;
         private LogicState state;
+        private Handler handler;
 
         public LedBuilder(String gpioName) {
             this.gpioName = gpioName;
@@ -155,12 +164,40 @@ public class Led implements AutoCloseable {
         }
 
         public Led build() throws IOException {
-            return new Led(gpioName, state);
+            return new Led(gpioName, state, handler);
         }
 
         public LedBuilder turnOnWhenLow() {
             state = LogicState.ON_WHEN_LOW;
             return this;
+        }
+
+        public LedBuilder withHandler(Handler handler) {
+            this.handler = handler;
+            return this;
+        }
+    }
+
+    public class TurnOffEvent implements Runnable {
+
+        @Override
+        public void run() {
+            try {
+                Off();
+            } catch (IOException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }
+    }
+
+    public class TurnOnEvent implements Runnable {
+        @Override
+        public void run() {
+            try {
+                On();
+            } catch (IOException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
         }
     }
 }

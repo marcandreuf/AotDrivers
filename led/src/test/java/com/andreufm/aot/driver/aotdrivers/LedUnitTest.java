@@ -1,6 +1,6 @@
 package com.andreufm.aot.driver.aotdrivers;
 
-import android.os.SystemClock;
+import android.os.Handler;
 import android.util.Log;
 import android.view.ViewConfiguration;
 
@@ -20,9 +20,17 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Matchers.isNotNull;
+import static org.mockito.Matchers.isNull;
 import static org.mockito.Mockito.contains;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
@@ -36,11 +44,12 @@ import static org.powermock.api.mockito.PowerMockito.when;
  */
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({ViewConfiguration.class, Led.class, Gpio.class,
-        Log.class, UserDriverFactory.class, SystemClock.class})
+        Log.class, UserDriverFactory.class})
 public class LedUnitTest {
 
     private static final String One = "1";
-    public static final int TIMEOUT = 1500;
+    private static final long TIMEOUT = 1500;
+    private Handler mocked_Handler;
 
     @Mock
     Gpio mocked_Gpio;
@@ -53,6 +62,7 @@ public class LedUnitTest {
 
     @Before
     public void setup() throws Exception {
+        mocked_Handler = mock(Handler.class);
         mockStatics();
         mockGpio();
         mockPeripheralMangerService();
@@ -64,20 +74,19 @@ public class LedUnitTest {
         ViewConfigurationMock.mockStatic();
         mockStatic(Log.class);
         mockStatic(UserDriverFactory.class);
-        mockStatic(SystemClock.class);
     }
 
     private void mockGpio() {
-        mocked_Gpio = Mockito.mock(Gpio.class);
+        mocked_Gpio = mock(Gpio.class);
     }
     private void mockPeripheralMangerService() throws IOException {
-        PeripheralManagerService mocked_perManSrv = Mockito.mock(PeripheralManagerService.class);
+        PeripheralManagerService mocked_perManSrv = mock(PeripheralManagerService.class);
         when(UserDriverFactory.getPeripheralManagerService()).thenReturn(mocked_perManSrv);
         when(mocked_perManSrv.openGpio(anyString())).thenReturn(mocked_Gpio);
     }
 
     private void createLedOnPinOneHigh() throws IOException {
-        led = Led.inGpio(One).turnOnWhenHigh().build();
+        led = Led.inGpio(One).turnOnWhenHigh().withHandler(mocked_Handler).build();
     }
 
     private void resetMocks() {
@@ -129,13 +138,7 @@ public class LedUnitTest {
         led.On(TIMEOUT);
 
         verify(mocked_Gpio).setValue(true);
-        verifyTimeout();
-        verify(mocked_Gpio).setValue(false);
-    }
-
-    private void verifyTimeout() {
-        verifyStatic();
-        SystemClock.sleep(TIMEOUT);
+        verify(mocked_Handler).postDelayed(isA(Led.TurnOffEvent.class), eq(TIMEOUT));
     }
 
     @Test
@@ -143,8 +146,7 @@ public class LedUnitTest {
         led.Off(TIMEOUT);
 
         verify(mocked_Gpio).setValue(false);
-        verifyTimeout();
-        verify(mocked_Gpio).setValue(true);
+        verify(mocked_Handler).postDelayed(isA(Led.TurnOnEvent.class), eq(TIMEOUT));
     }
 
     @Test

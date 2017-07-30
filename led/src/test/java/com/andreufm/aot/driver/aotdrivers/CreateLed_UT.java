@@ -1,5 +1,6 @@
 package com.andreufm.aot.driver.aotdrivers;
 
+import android.os.Handler;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.ViewConfiguration;
@@ -7,6 +8,7 @@ import android.view.ViewConfiguration;
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.PeripheralManagerService;
 
+import org.hamcrest.Matcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -17,7 +19,12 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.isNotNull;
+import static org.mockito.Matchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import static org.powermock.api.mockito.PowerMockito.when;
@@ -30,13 +37,15 @@ import static org.powermock.api.mockito.PowerMockito.when;
         Log.class, UserDriverFactory.class, SystemClock.class})
 public class CreateLed_UT {
 
-    public static final String One = "1";
+    private static final String One = "1";
+    private Handler mockedHandler;
 
     @Mock
     Gpio mocked_GPIO;
 
     @Before
     public void setup() throws Exception {
+        mockedHandler = mock(Handler.class);
         mockStatics();
         mockGpio();
         mockPeripheralMangerService();
@@ -51,11 +60,11 @@ public class CreateLed_UT {
     }
 
     private void mockGpio() {
-        mocked_GPIO = Mockito.mock(Gpio.class);
+        mocked_GPIO = mock(Gpio.class);
     }
 
     private void mockPeripheralMangerService() throws IOException {
-        PeripheralManagerService mocked_perManSrv = Mockito.mock(PeripheralManagerService.class);
+        PeripheralManagerService mocked_perManSrv = mock(PeripheralManagerService.class);
         when(UserDriverFactory.getPeripheralManagerService()).thenReturn(mocked_perManSrv);
         when(mocked_perManSrv.openGpio(anyString())).thenReturn(mocked_GPIO);
     }
@@ -83,11 +92,19 @@ public class CreateLed_UT {
     }
 
     @Test
-    public void createLedWithDefaultHandler(){
-        // assert that led.getHandler() is not null
+    public void createLedWithHandler() throws IOException {
+        Led led = Led.inGpio(One).turnOnWhenHigh().withHandler(mockedHandler).build();
+
+        assertNotNull(led.getHandler());
     }
 
-    //TODO: create led with handler, custom or testing handler for delayed actions.
+    @Test
+    public void createLedWithDefaultHandler() throws IOException {
+        Led led = Led.inGpio(One).turnOnWhenHigh().build();
+
+        assertNotNull(led.getHandler());
+    }
+
 
     //TODO: Setup led call back when LED switch state
 
