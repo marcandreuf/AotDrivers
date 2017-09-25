@@ -16,7 +16,9 @@ public class Led implements AutoCloseable {
     private static final String TAG = Led.class.getSimpleName();
     private static final String MSG_TURNED_ON = "Led turned ON !";
     private static final String MSG_TURNED_OFF = "Led turned OFF !";
+    public static final int MIN_BLINK_TIMEOUT = 100;
     private final Handler handler;
+    private int minBlinkTimeout = 100;
 
 
     private enum LogicState {
@@ -44,6 +46,7 @@ public class Led implements AutoCloseable {
     public static LedBuilder inGpio(String gpioName) {
         return new LedBuilder(gpioName);
     }
+
 
     private Led(String gpioName, LogicState logicState, Handler handler) throws IOException {
         this.handler = handler == null ? new Handler() : handler;
@@ -102,10 +105,18 @@ public class Led implements AutoCloseable {
         led.setValue(false);
     }
 
+    private void setMinBlinkTimeout(int minBlinkTimeout) {
+        this.minBlinkTimeout = minBlinkTimeout;
+    }
+
+
 
     @Override
     public void close() throws IOException {
+        //handler.removeCallbacks(new TurnOnEvent());
+        //Log.i(TAG, "Closing LED GPIO pin");
         led.close();
+
     }
 
     public void On() throws IOException {
@@ -119,7 +130,7 @@ public class Led implements AutoCloseable {
     }
 
     private void delayedOffEvent(long timeout) {
-        handler.postDelayed(new TurnOffEvent(), timeout);
+        handler.postDelayed(turnOffEvent, timeout);
     }
 
 
@@ -134,7 +145,7 @@ public class Led implements AutoCloseable {
     }
 
     private void delayedOnEvent(long timeout) {
-        handler.postDelayed(new TurnOnEvent(), timeout);
+        handler.postDelayed(turnOnEvent, timeout);
     }
 
     public void toggle() throws IOException {
@@ -145,7 +156,11 @@ public class Led implements AutoCloseable {
         return handler;
     }
 
-    public void blink(int i) {
+    public void blink(int interval) throws IOException {
+        if(interval > minBlinkTimeout) {
+            On();
+            handler.postDelayed(toggleLedEvent, interval);
+        }
 
     }
 
@@ -153,6 +168,7 @@ public class Led implements AutoCloseable {
         private final String gpioName;
         private LogicState state;
         private Handler handler;
+        private int minBlinkTimeout = MIN_BLINK_TIMEOUT;
 
         public LedBuilder(String gpioName) {
             this.gpioName = gpioName;
@@ -164,7 +180,9 @@ public class Led implements AutoCloseable {
         }
 
         public Led build() throws IOException {
-            return new Led(gpioName, state, handler);
+            Led ledInstance = new Led(gpioName, state, handler);
+            ledInstance.setMinBlinkTimeout(minBlinkTimeout);
+            return ledInstance;
         }
 
         public LedBuilder turnOnWhenLow() {
@@ -176,10 +194,16 @@ public class Led implements AutoCloseable {
             this.handler = handler;
             return this;
         }
+
+        public LedBuilder withMinBlinkTimeout(int minBlinkTimeout) {
+            this.minBlinkTimeout = minBlinkTimeout;
+            return this;
+        }
     }
 
-    public class TurnOffEvent implements Runnable {
+    private Runnable turnOffEvent = new TurnOffEvent();
 
+    protected class TurnOffEvent implements Runnable {
         @Override
         public void run() {
             try {
@@ -189,6 +213,8 @@ public class Led implements AutoCloseable {
             }
         }
     }
+
+    private Runnable turnOnEvent = new TurnOnEvent();
 
     public class TurnOnEvent implements Runnable {
         @Override

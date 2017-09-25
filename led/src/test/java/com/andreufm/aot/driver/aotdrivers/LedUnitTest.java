@@ -20,17 +20,12 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.isA;
-import static org.mockito.Matchers.isNotNull;
-import static org.mockito.Matchers.isNull;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.contains;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
@@ -49,6 +44,7 @@ public class LedUnitTest {
 
     private static final String One = "1";
     private static final long TIMEOUT = 1500;
+    public static final int CUSTOM_MIN_BLINK_TIMEOUT = 200;
     private Handler mocked_Handler;
 
     @Mock
@@ -86,11 +82,15 @@ public class LedUnitTest {
     }
 
     private void createLedOnPinOneHigh() throws IOException {
-        led = Led.inGpio(One).turnOnWhenHigh().withHandler(mocked_Handler).build();
+        led = Led.inGpio(One)
+                .turnOnWhenHigh()
+                .withHandler(mocked_Handler)
+                .build();
     }
 
     private void resetMocks() {
         Mockito.reset(mocked_Gpio);
+        Mockito.reset(mocked_Handler);
     }
 
     private void verifyLogMessageContains(String message) {
@@ -149,33 +149,49 @@ public class LedUnitTest {
         verify(mocked_Handler).postDelayed(isA(Led.TurnOnEvent.class), eq(TIMEOUT));
     }
 
+
     @Test
-    public void shouldNotDoAnythingForFrequencyLessThanThresholdBlinkValue(){
-        verifyNoBlink(0);
-        verifyNoBlink(50);
-        verifyNoBlink(90);
+    public void shouldNotBlinkForFrequencyLessThanDefaultMinimumTimeout() throws IOException {
+        verifyNoBlink(Led.MIN_BLINK_TIMEOUT);
+        verifyNoBlink(Led.MIN_BLINK_TIMEOUT - 50);
     }
 
-    private void verifyNoBlink(int frequency) {
+    @Test
+    public void shouldNotBlinkForFrequencyLessThanCustomMinimumTimeout() throws IOException {
+        Led customLed = Led.inGpio(One)
+                .turnOnWhenHigh()
+                .withHandler(mocked_Handler)
+                .withMinBlinkTimeout(CUSTOM_MIN_BLINK_TIMEOUT)
+                .build();
+        resetMocks();
+
+        customLed.blink(CUSTOM_MIN_BLINK_TIMEOUT - 50);
+
+        verifyZeroInteractions(mocked_Gpio);
+    }
+
+    private void verifyNoBlink(int frequency) throws IOException {
         led.blink(frequency);
 
         verifyZeroInteractions(mocked_Gpio);
     }
 
     @Test
-    @Ignore
-    public void shouldBlinkOnce(){
+    //@Ignore
+    public void shouldBlinkOnce() throws IOException {
 
         int INTERVAL_BETWEEN_BLINKS_MS = 1000;
 
         led.blink(INTERVAL_BETWEEN_BLINKS_MS);
 
-
-
         //verify called handler postdelay at least once
+        verify(mocked_Gpio).setValue(true);
+        verify(mocked_Handler, atLeast(1)).postDelayed(isA(Led.TurnOffEvent.class), INTERVAL_BETWEEN_BLINKS_MS);
+        //verify(mocked_Handler, atLeast(1)).postDelayed(isA(Led.TurnOnEvent.class), INTERVAL_BETWEEN_BLINKS_MS);
 
         // stop blink --> call led.Off() should remove events from handler
-
+        //led.Off();
+        //verify handler remove events
         //verify no more actions with handler
 
     }
