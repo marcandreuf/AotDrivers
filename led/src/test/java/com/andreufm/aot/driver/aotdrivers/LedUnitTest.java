@@ -166,7 +166,11 @@ public class LedUnitTest {
     @Ignore
     public void shouldBlinkOnce(){
 
-        led.blink(100);
+        int INTERVAL_BETWEEN_BLINKS_MS = 1000;
+
+        led.blink(INTERVAL_BETWEEN_BLINKS_MS);
+
+
 
         //verify called handler postdelay at least once
 
