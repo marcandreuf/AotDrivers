@@ -17,7 +17,8 @@ public class Led implements AutoCloseable {
     private static final String MSG_TURNED_ON = "Led turned ON !";
     private static final String MSG_TURNED_OFF = "Led turned OFF !";
     private final Handler handler;
-
+    private int blink_interval = 0;
+    private Runnable blinkEvent = new BlinkEvent();
 
     private enum LogicState {
         ON_WHEN_HIGH,
@@ -125,7 +126,9 @@ public class Led implements AutoCloseable {
 
     public void Off() throws IOException {
         Log.d(TAG, MSG_TURNED_OFF);
+        handler.removeCallbacks(blinkEvent);
         setLow();
+
     }
 
     public void Off(long timeout) throws IOException {
@@ -139,14 +142,17 @@ public class Led implements AutoCloseable {
 
     public void toggle() throws IOException {
         led.setValue(!led.getValue());
+        Log.d(TAG, "Toggled value to " + led.getValue());
     }
 
     public Handler getHandler() {
         return handler;
     }
 
-    public void blink(int i) {
 
+    public void blink(int interval) {
+        this.blink_interval = interval;
+        handler.post(blinkEvent);
     }
 
     public static class LedBuilder {
@@ -179,9 +185,9 @@ public class Led implements AutoCloseable {
     }
 
     public class TurnOffEvent implements Runnable {
-
         @Override
         public void run() {
+            if(led == null) return;
             try {
                 Off();
             } catch (IOException e) {
@@ -193,8 +199,23 @@ public class Led implements AutoCloseable {
     public class TurnOnEvent implements Runnable {
         @Override
         public void run() {
+            if(led == null) return;
             try {
                 On();
+            } catch (IOException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }
+    }
+
+
+    public class BlinkEvent implements Runnable {
+        @Override
+        public void run() {
+            if(led == null) return;
+            try {
+                toggle();
+                handler.postDelayed(blinkEvent, blink_interval);
             } catch (IOException e) {
                 Log.e(TAG, e.getMessage(), e);
             }

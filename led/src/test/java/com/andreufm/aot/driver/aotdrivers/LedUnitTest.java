@@ -31,6 +31,7 @@ import static org.mockito.Mockito.contains;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
@@ -125,12 +126,15 @@ public class LedUnitTest {
     @Test
     public void shouldToggleTheStateOfTheLed() throws IOException {
         boolean gpioValue = true;
-        Mockito.when(mocked_Gpio.getValue()).thenReturn(gpioValue);
+        Mockito.when(mocked_Gpio.getValue())
+                .thenReturn(gpioValue)
+                .thenReturn(false);
 
         led.toggle();
 
-        verify(mocked_Gpio).getValue();
+        verify(mocked_Gpio, times(2)).getValue();
         verify(mocked_Gpio).setValue(!gpioValue);
+        verifyLogMessageContains("Toggled value to "+!gpioValue);
     }
 
     @Test
@@ -163,21 +167,19 @@ public class LedUnitTest {
     }
 
     @Test
-    @Ignore
     public void shouldBlinkOnce(){
-
         int INTERVAL_BETWEEN_BLINKS_MS = 1000;
 
         led.blink(INTERVAL_BETWEEN_BLINKS_MS);
 
+        verify(mocked_Handler).post(isA(Led.BlinkEvent.class));
+    }
 
+    @Test
+    public void shouldStopBlinking() throws IOException {
+        led.Off();
 
-        //verify called handler postdelay at least once
-
-        // stop blink --> call led.Off() should remove events from handler
-
-        //verify no more actions with handler
-
+        verify(mocked_Handler).removeCallbacks(isA(Led.BlinkEvent.class));
     }
 
 
